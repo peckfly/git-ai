@@ -206,59 +206,6 @@ impl XcodeInstaller {
         ))
     }
 
-    fn launchctl_domain_target() -> Result<String, String> {
-        let uid = unsafe { libc::geteuid() };
-        if uid == 0 {
-            return Err(
-                "Unable to stop the watcher automatically from a root or non-GUI session"
-                    .to_string(),
-            );
-        }
-        Ok(format!("gui/{}", uid))
-    }
-
-    fn run_launchctl(args: &[String]) -> Result<(), String> {
-        let output = Command::new("launchctl")
-            .args(args)
-            .output()
-            .map_err(|e| format!("Unable to run launchctl: {}", e))?;
-
-        if output.status.success() {
-            return Ok(());
-        }
-
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let detail = if !stderr.is_empty() {
-            stderr
-        } else if !stdout.is_empty() {
-            stdout
-        } else {
-            format!("exit {}", output.status.code().unwrap_or(-1))
-        };
-        Err(detail)
-    }
-
-    fn bootout_launch_agent(domain: &str) -> Result<(), String> {
-        let args = vec![
-            "bootout".to_string(),
-            domain.to_string(),
-            Self::plist_path().to_string_lossy().to_string(),
-        ];
-        match Self::run_launchctl(&args) {
-            Ok(()) => Ok(()),
-            Err(error)
-                if error.contains("Could not find service")
-                    || error.contains("No such process")
-                    || error.contains("not loaded")
-                    || error.contains("service could not be found") =>
-            {
-                Ok(())
-            }
-            Err(error) => Err(error),
-        }
-    }
-
     fn remove_file_if_exists(path: &Path) -> Result<bool, String> {
         if !path.exists() {
             return Ok(false);
